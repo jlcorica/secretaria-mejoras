@@ -1,0 +1,440 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tablero SUPERSECRETARIA</title>
+<style>
+  :root {
+    color-scheme: light;
+    --page: #f9f9f7;
+    --surface: #fcfcfb;
+    --surface-2: #f3f2ee;
+    --ink: #0b0b0b;
+    --ink-2: #52514e;
+    --muted: #6f6d68;
+    --grid: #e1e0d9;
+    --axis: #c3c2b7;
+    --ring: rgba(11, 11, 11, 0.10);
+    --q1: #eb6834;
+    --q2: #2a78d6;
+    --q3: #1baf7a;
+    --q4: #898781;
+    --critical: #d03b3b;
+    --hoy: #0b0b0b;
+    --focus: #2a78d6;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      color-scheme: dark;
+      --page: #0d0d0d; --surface: #1a1a19; --surface-2: #232321;
+      --ink: #ffffff; --ink-2: #c3c2b7; --muted: #9a988f;
+      --grid: #2c2c2a; --axis: #383835; --ring: rgba(255, 255, 255, 0.10);
+      --q1: #d95926; --q2: #3987e5; --q3: #199e70; --q4: #7a7872;
+      --hoy: #ffffff; --focus: #3987e5;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --page: #0d0d0d; --surface: #1a1a19; --surface-2: #232321;
+    --ink: #ffffff; --ink-2: #c3c2b7; --muted: #9a988f;
+    --grid: #2c2c2a; --axis: #383835; --ring: rgba(255, 255, 255, 0.10);
+    --q1: #d95926; --q2: #3987e5; --q3: #199e70; --q4: #7a7872;
+    --hoy: #ffffff; --focus: #3987e5;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--page); color: var(--ink);
+    font: 14px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  .envoltura { max-width: 1400px; margin: 0 auto; padding: 16px; }
+
+  header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 16px; margin-bottom: 12px; }
+  h1 { font-size: 20px; margin: 0; letter-spacing: 0.01em; }
+  .sello { color: var(--muted); font-size: 12px; }
+  .aviso-publico {
+    font-size: 12px; padding: 2px 8px; border-radius: 999px;
+    background: var(--surface-2); color: var(--ink-2); box-shadow: inset 0 0 0 1px var(--ring);
+  }
+
+  .controles { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; margin-bottom: 12px; }
+  .segmentado { display: inline-flex; background: var(--surface-2); border-radius: 8px; padding: 2px; box-shadow: inset 0 0 0 1px var(--ring); }
+  .segmentado button {
+    border: 0; background: transparent; color: var(--ink-2); font: inherit; font-weight: 600;
+    padding: 6px 14px; border-radius: 6px; cursor: pointer;
+  }
+  .segmentado button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 0 0 1px var(--ring); }
+  select, input[type="search"] {
+    font: inherit; color: var(--ink); background: var(--surface); border: 0; border-radius: 6px;
+    padding: 6px 8px; box-shadow: inset 0 0 0 1px var(--ring); max-width: 100%;
+  }
+  input[type="search"] { width: 220px; }
+  label.check { display: inline-flex; gap: 6px; align-items: center; color: var(--ink-2); cursor: pointer; }
+  button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  .tema { margin-left: auto; }
+  .tema button { border: 0; background: transparent; color: var(--ink-2); font: inherit; cursor: pointer; padding: 6px 8px; border-radius: 6px; }
+
+  .leyenda { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 0 0 12px; padding: 0; list-style: none; color: var(--ink-2); font-size: 13px; }
+  .leyenda li { display: inline-flex; align-items: center; gap: 6px; }
+  .muestra { width: 12px; height: 12px; border-radius: 3px; display: inline-block; flex: none; }
+  .rombo { width: 9px; height: 9px; transform: rotate(45deg); border: 2px solid var(--ink-2); background: var(--surface); display: inline-block; }
+  .linea-hoy { width: 2px; height: 14px; background: var(--hoy); display: inline-block; }
+
+  .panel { background: var(--surface); border-radius: 12px; box-shadow: 0 0 0 1px var(--ring); overflow: hidden; }
+
+  /* ---------- Gantt ---------- */
+  .gantt { display: grid; grid-template-columns: minmax(180px, 34%) 1fr; }
+  .gantt-etiquetas { border-right: 1px solid var(--grid); }
+  .gantt-linea { position: relative; overflow: hidden; }
+  .fila { height: 30px; display: flex; align-items: center; }
+  .gantt-etiquetas .fila { padding: 0 10px; gap: 8px; min-width: 0; }
+  .fila.cabecera-eje { height: 34px; border-bottom: 1px solid var(--grid); color: var(--muted); font-size: 12px; }
+  .fila.grupo { background: var(--surface-2); font-weight: 600; font-size: 12px; color: var(--ink-2); letter-spacing: 0.02em; }
+  .fila.subgrupo { font-weight: 600; font-size: 12px; color: var(--ink-2); padding-left: 18px !important; }
+  .etiqueta-tarea { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1; padding-left: 16px; }
+  .etiqueta-tarea.cerrada { color: var(--muted); text-decoration: line-through; }
+  .chip-q { font-size: 11px; font-weight: 700; color: var(--ink-2); flex: none; font-variant-numeric: tabular-nums; }
+  .estado-icono { flex: none; font-size: 12px; }
+
+  .eje-mes { position: absolute; top: 0; height: 34px; border-left: 1px solid var(--grid); padding: 9px 0 0 6px; font-size: 12px; color: var(--muted); white-space: nowrap; }
+  .reticula { position: absolute; top: 34px; bottom: 0; border-left: 1px solid var(--grid); }
+  .hoy { position: absolute; top: 34px; bottom: 0; width: 2px; background: var(--hoy); z-index: 3; }
+  .hoy-rotulo { position: absolute; top: 2px; transform: translateX(-50%); font-size: 11px; font-weight: 700; color: var(--ink); background: var(--surface); padding: 0 4px; z-index: 4; }
+  .fila-linea { position: relative; height: 30px; }
+  .fila-linea.grupo { background: var(--surface-2); }
+  .barra {
+    position: absolute; top: 10px; height: 10px; border-radius: 4px; min-width: 6px;
+    box-shadow: 0 0 0 2px var(--surface); cursor: default;
+  }
+  .barra.cerrada { opacity: 0.35; }
+  .barra.vencida { background: transparent !important; box-shadow: inset 0 0 0 2px var(--critical); }
+  .control {
+    position: absolute; top: 10px; width: 10px; height: 10px; margin-left: -5px; transform: rotate(45deg);
+    background: var(--surface); border: 2px solid var(--ink-2); z-index: 2;
+  }
+  .rotulo-barra { position: absolute; top: 7px; font-size: 11px; color: var(--ink-2); white-space: nowrap; }
+  .rotulo-barra.alerta { color: var(--critical); font-weight: 600; }
+  .fuera { position: absolute; top: 7px; right: 6px; font-size: 11px; color: var(--muted); }
+  .blanco-hover { position: absolute; top: 0; height: 30px; }
+
+  /* ---------- Eisenhower ---------- */
+  .matriz { display: grid; grid-template-columns: 28px 1fr 1fr; grid-template-rows: auto 1fr 1fr; gap: 12px; }
+  .eje-x { text-align: center; font-size: 12px; font-weight: 700; letter-spacing: 0.08em; color: var(--muted); text-transform: uppercase; }
+  .eje-y { writing-mode: vertical-rl; transform: rotate(180deg); text-align: center; font-size: 12px; font-weight: 700; letter-spacing: 0.08em; color: var(--muted); text-transform: uppercase; }
+  .cuadrante { background: var(--surface); border-radius: 12px; box-shadow: 0 0 0 1px var(--ring); display: flex; flex-direction: column; min-height: 200px; overflow: hidden; }
+  .cuadrante h2 { margin: 0; padding: 12px 14px 10px; font-size: 15px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--grid); }
+  .cuadrante h2 .subtitulo { font-weight: 400; color: var(--muted); font-size: 13px; }
+  .cuadrante h2 .cuenta { margin-left: auto; font-variant-numeric: tabular-nums; color: var(--ink-2); font-size: 13px; }
+  .cuadrante ol { list-style: none; margin: 0; padding: 4px 0; overflow: auto; max-height: 460px; }
+  .cuadrante li { padding: 8px 14px; border-bottom: 1px solid var(--grid); }
+  .cuadrante li:last-child { border-bottom: 0; }
+  .cuadrante .texto { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .cuadrante .texto.cerrada { color: var(--muted); text-decoration: line-through; }
+  .meta { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 12px; color: var(--muted); margin-top: 2px; font-variant-numeric: tabular-nums; }
+  .meta .alerta { color: var(--critical); font-weight: 600; }
+  .vacio { padding: 16px 14px; color: var(--muted); font-size: 13px; }
+
+  .tooltip {
+    position: fixed; z-index: 10; pointer-events: none; max-width: 320px;
+    background: var(--surface); color: var(--ink); border-radius: 8px; padding: 8px 10px; font-size: 12px;
+    box-shadow: 0 0 0 1px var(--ring), 0 6px 20px rgba(0, 0, 0, 0.18);
+  }
+  .tooltip strong { display: block; font-size: 13px; margin-bottom: 4px; }
+  .tooltip dl { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; margin: 0; }
+  .tooltip dt { color: var(--muted); }
+  .tooltip dd { margin: 0; font-variant-numeric: tabular-nums; }
+
+  .error { padding: 24px; color: var(--ink-2); }
+  [hidden] { display: none !important; }
+
+  @media (max-width: 760px) {
+    .matriz { grid-template-columns: 1fr; grid-template-rows: none; }
+    .eje-x, .eje-y, .esquina { display: none; }
+    .gantt { grid-template-columns: 150px 1fr; }
+    input[type="search"] { width: 100%; }
+    .tema { margin-left: 0; }
+  }
+</style>
+</head>
+<body>
+<div class="envoltura">
+  <header>
+    <h1>SUPERSECRETARIA</h1>
+    <span class="sello" id="sello"></span>
+    <span class="aviso-publico" id="aviso-publico" hidden>Vista pública anonimizada: solo códigos y primera palabra</span>
+  </header>
+
+  <div class="controles">
+    <div class="segmentado" role="group" aria-label="Vista">
+      <button type="button" data-vista="gantt" aria-pressed="true">Gantt</button>
+      <button type="button" data-vista="eisenhower" aria-pressed="false">Eisenhower</button>
+    </div>
+    <select id="filtro-proyecto" aria-label="Proyecto"></select>
+    <select id="filtro-rango" aria-label="Período del Gantt">
+      <option value="30">Próximos 30 días</option>
+      <option value="90" selected>Próximos 90 días</option>
+      <option value="180">Próximos 6 meses</option>
+      <option value="todo">Todo</option>
+    </select>
+    <input type="search" id="filtro-texto" placeholder="Buscar tarea o código…" aria-label="Buscar">
+    <label class="check"><input type="checkbox" id="filtro-cerradas"> Mostrar hechas y suspendidas</label>
+    <div class="tema"><button type="button" id="boton-tema" aria-label="Cambiar tema">◐ Tema</button></div>
+  </div>
+
+  <ul class="leyenda" id="leyenda"></ul>
+
+  <section id="vista-gantt" class="panel" aria-label="Diagrama de Gantt"></section>
+  <section id="vista-eisenhower" aria-label="Matriz de Eisenhower" hidden></section>
+</div>
+<div class="tooltip" id="tooltip" role="tooltip" hidden></div>
+
+<script src="datos.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  const CUADRANTES = {
+    Q1: { nombre: "Hacer ahora", eje: "Urgente · Importante" },
+    Q2: { nombre: "Planificar", eje: "No urgente · Importante" },
+    Q3: { nombre: "Delegar", eje: "Urgente · No importante" },
+    Q4: { nombre: "No perder de vista", eje: "No urgente · No importante" },
+  };
+  const ESTADOS = {
+    "pendiente": "", "en curso": "▶", "bloqueada": "⛔", "hecha": "✓", "suspendida": "⏸",
+  };
+  const CERRADAS = new Set(["hecha", "suspendida"]);
+  const DIA = 86400000;
+  const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+
+  const datos = window.SS_DATOS;
+  const $ = (id) => document.getElementById(id);
+  if (!datos || !Array.isArray(datos.tareas)) {
+    $("vista-gantt").innerHTML = '<p class="error">No encontré <code>datos.js</code>. Generalo con <code>python3 scripts/exportar_tablero.py</code>.</p>';
+    return;
+  }
+
+  const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+  const aFecha = (iso) => { if (!iso) return null; const [a, m, d] = iso.split("-").map(Number); return new Date(a, m - 1, d); };
+  const dias = (f) => Math.round((f - hoy) / DIA);
+  const corta = (f) => `${String(f.getDate()).padStart(2, "0")}/${String(f.getMonth() + 1).padStart(2, "0")}`;
+  const larga = (f) => `${corta(f)}/${f.getFullYear()}`;
+  const escapar = (t) => String(t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const nombre = (cod) => (datos.nombres && datos.nombres[cod]) ? `${cod} ${datos.nombres[cod]}` : cod;
+  const recurrencia = (r) => {
+    if (!r) return "";
+    if (r.startsWith("semanal:")) return `cada ${r.split(":")[1]}`;
+    const dia = (r.match(/dia=(\d+)/) || [])[1];
+    return r.includes("impares") ? `día ${dia}, meses impares` : `día ${dia} de cada mes`;
+  };
+  const plazo = (f) => {
+    const n = dias(f);
+    if (n < 0) return { texto: `vencida hace ${-n} d`, alerta: true };
+    if (n === 0) return { texto: "vence hoy", alerta: true };
+    return { texto: `en ${n} d`, alerta: false };
+  };
+
+  const tareas = datos.tareas.map((t) => ({
+    ...t,
+    venc: aFecha(t.fecha_vencimiento),
+    ctrl: aFecha(t.fecha_control),
+    inicio: aFecha(t.creado) || hoy,
+    cerrada: CERRADAS.has(t.estado),
+  }));
+
+  // ---------- Estado de la interfaz (preferencias locales, opcionales) ----------
+  const guardar = (k, v) => { try { localStorage.setItem("ss-tablero-" + k, v); } catch (e) { /* sin almacenamiento */ } };
+  const leer = (k) => { try { return localStorage.getItem("ss-tablero-" + k); } catch (e) { return null; } };
+  const estado = {
+    vista: leer("vista") || "gantt",
+    proyecto: "",
+    rango: leer("rango") || "90",
+    texto: "",
+    cerradas: false,
+  };
+
+  // ---------- Cabecera y controles ----------
+  $("sello").textContent = `Datos: ${datos.generado}${datos.publico ? "" : " · " + datos.fuente}`;
+  $("aviso-publico").hidden = !datos.publico;
+
+  const proyectos = [...new Set(tareas.map((t) => t.proyecto_cod))].sort();
+  $("filtro-proyecto").innerHTML = '<option value="">Todos los proyectos</option>' +
+    proyectos.map((p) => `<option value="${p}">${escapar(nombre(p))}</option>`).join("");
+  $("filtro-rango").value = estado.rango;
+
+  $("leyenda").innerHTML = Object.entries(CUADRANTES).map(([q, c]) =>
+    `<li><span class="muestra" style="background:var(--${q.toLowerCase()})"></span>${q} · ${c.nombre}</li>`).join("") +
+    '<li><span class="rombo"></span>Fecha de control</li><li><span class="linea-hoy"></span>Hoy</li>' +
+    '<li><span class="muestra" style="box-shadow:inset 0 0 0 2px var(--critical)"></span>⚠ Vencida</li>';
+
+  document.querySelectorAll("[data-vista]").forEach((b) => b.addEventListener("click", () => {
+    estado.vista = b.dataset.vista; guardar("vista", estado.vista); pintar();
+  }));
+  $("filtro-proyecto").addEventListener("change", (e) => { estado.proyecto = e.target.value; pintar(); });
+  $("filtro-rango").addEventListener("change", (e) => { estado.rango = e.target.value; guardar("rango", estado.rango); pintar(); });
+  $("filtro-texto").addEventListener("input", (e) => { estado.texto = e.target.value.trim().toLowerCase(); pintar(); });
+  $("filtro-cerradas").addEventListener("change", (e) => { estado.cerradas = e.target.checked; pintar(); });
+  $("boton-tema").addEventListener("click", () => {
+    const raiz = document.documentElement;
+    const oscuro = raiz.dataset.theme ? raiz.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+    raiz.dataset.theme = oscuro ? "light" : "dark";
+    guardar("tema", raiz.dataset.theme);
+  });
+  const temaGuardado = leer("tema");
+  if (temaGuardado) document.documentElement.dataset.theme = temaGuardado;
+
+  function filtradas() {
+    return tareas.filter((t) =>
+      (!estado.proyecto || t.proyecto_cod === estado.proyecto) &&
+      (estado.cerradas || !t.cerrada) &&
+      (!estado.texto || `${t.tarea} ${t.subproyecto_cod} ${t.subproyecto || ""} ${t.proyecto || ""}`.toLowerCase().includes(estado.texto)));
+  }
+  const porFecha = (a, b) => (a.venc || Infinity) - (b.venc || Infinity) || a.tarea.localeCompare(b.tarea);
+
+  // ---------- Tooltip ----------
+  const tooltip = $("tooltip");
+  function mostrarTooltip(t, x, y) {
+    const filas = [
+      ["Código", t.subproyecto_cod],
+      ["Cuadrante", `${t.cuadrante} · ${CUADRANTES[t.cuadrante] ? CUADRANTES[t.cuadrante].nombre : ""}`],
+      ["Estado", `${ESTADOS[t.estado] || ""} ${t.estado}`.trim()],
+      ["Vence", t.venc ? `${larga(t.venc)} (${plazo(t.venc).texto})` : "sin fecha"],
+    ];
+    if (t.ctrl) filas.push(["Control", larga(t.ctrl)]);
+    if (t.recurrencia) filas.push(["Se repite", recurrencia(t.recurrencia)]);
+    if (!datos.publico && t.subproyecto) filas.push(["Subproyecto", t.subproyecto]);
+    tooltip.innerHTML = `<strong>${escapar(t.tarea)}</strong><dl>` +
+      filas.map(([k, v]) => `<dt>${k}</dt><dd>${escapar(v)}</dd>`).join("") + "</dl>";
+    tooltip.hidden = false;
+    const r = tooltip.getBoundingClientRect();
+    tooltip.style.left = Math.min(x + 14, innerWidth - r.width - 8) + "px";
+    tooltip.style.top = (y + 14 + r.height > innerHeight ? y - r.height - 10 : y + 14) + "px";
+  }
+  document.addEventListener("pointermove", (e) => {
+    const destino = e.target.closest("[data-id]");
+    if (!destino) { tooltip.hidden = true; return; }
+    const t = tareas.find((x) => x.id === destino.dataset.id);
+    if (t) mostrarTooltip(t, e.clientX, e.clientY);
+  });
+  document.addEventListener("scroll", () => { tooltip.hidden = true; }, true);
+
+  // ---------- Gantt ----------
+  function pintarGantt(lista) {
+    const cont = $("vista-gantt");
+    const conFecha = lista.filter((t) => t.venc);
+    let desde = new Date(hoy.getTime() - 7 * DIA);
+    let hasta;
+    if (estado.rango === "todo") {
+      const ext = conFecha.flatMap((t) => [t.venc, t.inicio, t.ctrl].filter(Boolean));
+      desde = new Date(Math.min(desde, ...ext));
+      hasta = new Date(Math.max(hoy.getTime() + 30 * DIA, ...ext) + 7 * DIA);
+    } else {
+      hasta = new Date(hoy.getTime() + Number(estado.rango) * DIA);
+    }
+    const total = (hasta - desde) / DIA;
+    const pos = (f) => ((f - desde) / DIA / total) * 100;
+    const dentro = (f) => f >= desde && f <= hasta;
+
+    // Agrupar por proyecto › subproyecto
+    const grupos = new Map();
+    lista.slice().sort((a, b) => a.subproyecto_cod.localeCompare(b.subproyecto_cod) || porFecha(a, b)).forEach((t) => {
+      if (!grupos.has(t.proyecto_cod)) grupos.set(t.proyecto_cod, new Map());
+      const subs = grupos.get(t.proyecto_cod);
+      if (!subs.has(t.subproyecto_cod)) subs.set(t.subproyecto_cod, []);
+      subs.get(t.subproyecto_cod).push(t);
+    });
+
+    const etiquetas = ['<div class="fila cabecera-eje">Tarea</div>'];
+    const lineas = [];
+    grupos.forEach((subs, p) => {
+      etiquetas.push(`<div class="fila grupo">${escapar(nombre(p))}</div>`);
+      lineas.push('<div class="fila-linea grupo"></div>');
+      subs.forEach((items, s) => {
+        if (!s.endsWith("-000")) {
+          etiquetas.push(`<div class="fila subgrupo">${escapar(nombre(s))}</div>`);
+          lineas.push('<div class="fila-linea"></div>');
+        }
+        items.forEach((t) => {
+          etiquetas.push(`<div class="fila" data-id="${t.id}"><span class="chip-q">${t.cuadrante}</span>` +
+            `<span class="etiqueta-tarea${t.cerrada ? " cerrada" : ""}">${escapar(t.tarea)}</span>` +
+            (ESTADOS[t.estado] ? `<span class="estado-icono" title="${t.estado}">${ESTADOS[t.estado]}</span>` : "") + "</div>");
+          lineas.push(`<div class="fila-linea" data-id="${t.id}">${barra(t)}</div>`);
+        });
+      });
+    });
+
+    function barra(t) {
+      if (!t.venc) return '<span class="rotulo-barra" style="left:8px">sin fecha</span>';
+      const color = `var(--${t.cuadrante.toLowerCase()})`;
+      const vencida = !t.cerrada && t.venc < hoy;
+      let a = vencida ? t.venc : (t.inicio < t.venc ? t.inicio : t.venc);
+      let b = vencida ? hoy : t.venc;
+      let html = "";
+      if (b < desde || a > hasta) {
+        html += `<span class="fuera">${a > hasta ? "→ " + corta(t.venc) : ""}</span>`;
+      } else {
+        const izq = pos(a < desde ? desde : a), der = pos(b > hasta ? hasta : b);
+        html += `<div class="barra${t.cerrada ? " cerrada" : ""}${vencida ? " vencida" : ""}" style="left:${izq}%;width:calc(${der - izq}% + 4px);background:${color}"></div>`;
+        const p = plazo(t.venc);
+        const rotulo = vencida ? `⚠ ${p.texto}` : corta(t.venc);
+        if (der < 88) html += `<span class="rotulo-barra${vencida ? " alerta" : ""}" style="left:calc(${der}% + 10px)">${rotulo}</span>`;
+        else html += `<span class="rotulo-barra${vencida ? " alerta" : ""}" style="right:calc(${100 - izq}% + 8px)">${rotulo}</span>`;
+      }
+      if (t.ctrl && dentro(t.ctrl)) html += `<span class="control" style="left:${pos(t.ctrl)}%" title="Control ${corta(t.ctrl)}"></span>`;
+      return html;
+    }
+
+    // Eje: meses y semanas
+    const eje = [];
+    const cursor = new Date(desde.getFullYear(), desde.getMonth(), 1);
+    while (cursor <= hasta) {
+      if (cursor >= desde) eje.push(`<div class="eje-mes" style="left:${pos(cursor)}%">${MESES[cursor.getMonth()]} ${cursor.getFullYear() !== hoy.getFullYear() ? cursor.getFullYear() : ""}</div>`);
+      cursor.setMonth(cursor.getMonth() + 1);
+    }
+    if (total <= 120) {
+      const lunes = new Date(desde); lunes.setDate(lunes.getDate() + ((8 - lunes.getDay()) % 7));
+      for (; lunes <= hasta; lunes.setDate(lunes.getDate() + 7)) eje.push(`<div class="reticula" style="left:${pos(lunes)}%"></div>`);
+    }
+
+    cont.innerHTML = lista.length === 0 ? '<p class="vacio">No hay tareas con estos filtros.</p>' :
+      `<div class="gantt"><div class="gantt-etiquetas">${etiquetas.join("")}</div>` +
+      `<div class="gantt-linea">${eje.join("")}<div class="hoy" style="left:${pos(hoy)}%"></div>` +
+      `<div class="hoy-rotulo" style="left:${pos(hoy)}%">Hoy</div><div class="fila cabecera-eje"></div>${lineas.join("")}</div></div>`;
+  }
+
+  // ---------- Eisenhower ----------
+  function pintarEisenhower(lista) {
+    const cont = $("vista-eisenhower");
+    const tarjeta = (q) => {
+      const items = lista.filter((t) => t.cuadrante === q).sort(porFecha);
+      const cuerpo = items.length === 0 ? '<p class="vacio">Sin tareas.</p>' : "<ol>" + items.map((t) => {
+        const p = t.venc ? plazo(t.venc) : null;
+        return `<li data-id="${t.id}"><div class="texto${t.cerrada ? " cerrada" : ""}">${escapar(t.tarea)}</div>` +
+          `<div class="meta"><span>${t.subproyecto_cod}</span>` +
+          (t.venc ? `<span class="${p.alerta && !t.cerrada ? "alerta" : ""}">${p.alerta && !t.cerrada ? "⚠ " : ""}${corta(t.venc)} · ${p.texto}</span>` : "<span>sin fecha</span>") +
+          (t.ctrl ? `<span>◆ control ${corta(t.ctrl)}</span>` : "") +
+          (t.recurrencia ? `<span>↻ ${recurrencia(t.recurrencia)}</span>` : "") +
+          (t.estado !== "pendiente" ? `<span>${ESTADOS[t.estado] || ""} ${t.estado}</span>` : "") +
+          "</div></li>";
+      }).join("") + "</ol>";
+      return `<article class="cuadrante"><h2><span class="muestra" style="background:var(--${q.toLowerCase()})"></span>${q} ` +
+        `<span class="subtitulo">${CUADRANTES[q].nombre}</span><span class="cuenta">${items.length}</span></h2>${cuerpo}</article>`;
+    };
+    cont.innerHTML = `<div class="matriz"><div class="esquina"></div><div class="eje-x">Urgente</div><div class="eje-x">No urgente</div>` +
+      `<div class="eje-y">Importante</div>${tarjeta("Q1")}${tarjeta("Q2")}` +
+      `<div class="eje-y">No importante</div>${tarjeta("Q3")}${tarjeta("Q4")}</div>`;
+  }
+
+  function pintar() {
+    const lista = filtradas();
+    document.querySelectorAll("[data-vista]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.vista === estado.vista)));
+    $("vista-gantt").hidden = estado.vista !== "gantt";
+    $("vista-eisenhower").hidden = estado.vista !== "eisenhower";
+    $("filtro-rango").hidden = estado.vista !== "gantt";
+    if (estado.vista === "gantt") pintarGantt(lista); else pintarEisenhower(lista);
+  }
+  pintar();
+})();
+</script>
+</body>
+</html>
