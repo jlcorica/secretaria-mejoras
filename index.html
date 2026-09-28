@@ -145,6 +145,32 @@
   .tooltip dt { color: var(--muted); }
   .tooltip dd { margin: 0; font-variant-numeric: tabular-nums; }
 
+  /* ---------- Historial ---------- */
+  .historial-dia { background: var(--surface); border-radius: 12px; box-shadow: 0 0 0 1px var(--ring); margin-bottom: 12px; overflow: hidden; }
+  .historial-dia h2 { margin: 0; padding: 10px 14px; font-size: 14px; display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; border-bottom: 1px solid var(--grid); background: var(--surface-2); }
+  .historial-dia h2 .resumen { font-weight: 400; color: var(--muted); font-size: 12px; }
+  .historial-dia ol { list-style: none; margin: 0; padding: 0; }
+  .historial-dia li { padding: 8px 14px; border-bottom: 1px solid var(--grid); display: grid; grid-template-columns: 44px 1fr; gap: 2px 10px; }
+  .historial-dia li:last-child { border-bottom: 0; }
+  .historial-dia .hora { color: var(--muted); font-variant-numeric: tabular-nums; font-size: 12px; padding-top: 1px; }
+  .historial-dia .accion { min-width: 0; }
+  .historial-dia .accion strong { font-weight: 600; }
+  .historial-dia .detalle { color: var(--ink-2); }
+  .historial-dia .original { grid-column: 2; color: var(--muted); font-size: 12px; font-style: italic; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .etiqueta { display: inline-block; font-size: 11px; padding: 0 6px; border-radius: 999px; background: var(--surface-2); color: var(--ink-2); box-shadow: inset 0 0 0 1px var(--ring); margin-left: 6px; vertical-align: 1px; }
+  .etiqueta.hecha { color: var(--q3); }
+  .proyectos-hist { background: var(--surface); border-radius: 12px; box-shadow: 0 0 0 1px var(--ring); overflow: hidden; }
+  .proyecto-hist { padding: 12px 14px; border-bottom: 1px solid var(--grid); }
+  .proyecto-hist:last-child { border-bottom: 0; }
+  .proyecto-hist h3 { margin: 0 0 6px; font-size: 14px; display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; }
+  .proyecto-hist h3 .resumen { font-weight: 400; color: var(--muted); font-size: 12px; }
+  .tira { display: grid; gap: 2px; height: 18px; }
+  .tira span { background: var(--surface-2); border-radius: 2px; }
+  .tira span.activo { background: var(--q2); }
+  .tira span.hoy-celda { box-shadow: inset 0 0 0 1px var(--hoy); }
+  .tira-eje { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-top: 2px; font-variant-numeric: tabular-nums; }
+  .pausas { margin: 6px 0 0; padding: 0; list-style: none; font-size: 12px; color: var(--ink-2); display: flex; flex-wrap: wrap; gap: 2px 14px; }
+
   .error { padding: 24px; color: var(--ink-2); }
   [hidden] { display: none !important; }
 
@@ -152,6 +178,7 @@
     .matriz { grid-template-columns: 1fr; grid-template-rows: none; }
     .eje-x, .eje-y, .esquina { display: none; }
     .gantt { grid-template-columns: 150px 1fr; }
+    .historial-dia li { grid-template-columns: 38px 1fr; }
     input[type="search"] { width: 100%; }
     .tema { margin-left: 0; }
   }
@@ -169,6 +196,11 @@
     <div class="segmentado" role="group" aria-label="Vista">
       <button type="button" data-vista="gantt" aria-pressed="true">Gantt</button>
       <button type="button" data-vista="eisenhower" aria-pressed="false">Eisenhower</button>
+      <button type="button" data-vista="historial" aria-pressed="false">Historial</button>
+    </div>
+    <div class="segmentado" id="modo-historial" role="group" aria-label="Historial" hidden>
+      <button type="button" data-modo="dia" aria-pressed="true">Por día</button>
+      <button type="button" data-modo="proyecto" aria-pressed="false">Por proyecto</button>
     </div>
     <select id="filtro-proyecto" aria-label="Proyecto"></select>
     <select id="filtro-rango" aria-label="Período del Gantt">
@@ -178,7 +210,16 @@
       <option value="todo">Todo</option>
     </select>
     <input type="search" id="filtro-texto" placeholder="Buscar tarea o código…" aria-label="Buscar">
-    <label class="check"><input type="checkbox" id="filtro-cerradas"> Mostrar hechas y suspendidas</label>
+    <select id="filtro-periodo" aria-label="Período del historial" hidden>
+      <option value="7">Últimos 7 días</option>
+      <option value="30" selected>Últimos 30 días</option>
+      <option value="90">Últimos 90 días</option>
+      <option value="365">Último año</option>
+      <option value="todo">Todo</option>
+    </select>
+    <label class="check" id="check-cerradas"><input type="checkbox" id="filtro-cerradas"> Mostrar hechas y suspendidas</label>
+    <label class="check" id="check-terminadas" hidden><input type="checkbox" id="filtro-terminadas"> Solo terminadas</label>
+    <label class="check" id="check-automaticos" hidden title="Movimientos de la revisión diaria de las 09:00 y la migración inicial"><input type="checkbox" id="filtro-automaticos"> Incluir automáticos</label>
     <div class="tema"><button type="button" id="boton-tema" aria-label="Cambiar tema">◐ Tema</button></div>
   </div>
 
@@ -186,6 +227,7 @@
 
   <section id="vista-gantt" class="panel" aria-label="Diagrama de Gantt"></section>
   <section id="vista-eisenhower" aria-label="Matriz de Eisenhower" hidden></section>
+  <section id="vista-historial" aria-label="Historial" hidden></section>
 </div>
 <div class="tooltip" id="tooltip" role="tooltip" hidden></div>
 
@@ -251,11 +293,20 @@
     rango: leer("rango") || "90",
     texto: "",
     cerradas: false,
+    modo: leer("modo") || "dia",
+    periodo: leer("periodo") || "30",
+    terminadas: false,
+    automaticos: false,
   };
 
   // ---------- Cabecera y controles ----------
   $("sello").textContent = `Datos: ${datos.generado}${datos.publico ? "" : " · " + datos.fuente}`;
   $("aviso-publico").hidden = !datos.publico;
+  // La bitácora tiene texto original del Director: el tablero público no muestra el Historial.
+  if (datos.publico) {
+    document.querySelector('[data-vista="historial"]').remove();
+    if (estado.vista === "historial") estado.vista = "gantt";
+  }
 
   const proyectos = [...new Set(tareas.map((t) => t.proyecto_cod))].sort();
   $("filtro-proyecto").innerHTML = '<option value="">Todos los proyectos</option>' +
@@ -274,6 +325,13 @@
   $("filtro-rango").addEventListener("change", (e) => { estado.rango = e.target.value; guardar("rango", estado.rango); pintar(); });
   $("filtro-texto").addEventListener("input", (e) => { estado.texto = e.target.value.trim().toLowerCase(); pintar(); });
   $("filtro-cerradas").addEventListener("change", (e) => { estado.cerradas = e.target.checked; pintar(); });
+  document.querySelectorAll("[data-modo]").forEach((b) => b.addEventListener("click", () => {
+    estado.modo = b.dataset.modo; guardar("modo", estado.modo); pintar();
+  }));
+  $("filtro-periodo").value = estado.periodo;
+  $("filtro-periodo").addEventListener("change", (e) => { estado.periodo = e.target.value; guardar("periodo", estado.periodo); pintar(); });
+  $("filtro-terminadas").addEventListener("change", (e) => { estado.terminadas = e.target.checked; pintar(); });
+  $("filtro-automaticos").addEventListener("change", (e) => { estado.automaticos = e.target.checked; pintar(); });
   $("boton-tema").addEventListener("click", () => {
     const raiz = document.documentElement;
     const oscuro = raiz.dataset.theme ? raiz.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
@@ -425,13 +483,142 @@
       `<div class="eje-y">No importante</div>${tarjeta("Q3")}${tarjeta("Q4")}</div>`;
   }
 
+  // ---------- Historial (desde la BITACORA) ----------
+  const DIAS_SEMANA = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
+  const MESES_LARGOS = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+  const VIAS = { telegram: "Telegram", claude: "Claude", automatico: "automático", manual: "migración" };
+  const porId = new Map(tareas.map((t) => [t.id, t]));
+  const isoDia = (f) => `${f.getFullYear()}-${String(f.getMonth() + 1).padStart(2, "0")}-${String(f.getDate()).padStart(2, "0")}`;
+  const fechaCorta = (iso) => { const f = aFecha(iso.slice(0, 10)); return f ? corta(f) : iso; };
+  const valorFecha = (v) => { const m = String(v).match(/(\d{4}-\d{2}-\d{2})/); return m ? fechaCorta(m[1]) : (v || "—"); };
+
+  const acciones = (datos.bitacora || []).map((b) => {
+    const t = porId.get(b.id_tarea);
+    const sub = t ? t.subproyecto_cod : (b.codigo_publico.match(/^\d{3}-\d{3}/) || [""])[0];
+    return {
+      ...b, dia: b.fecha_hora.slice(0, 10), hora: b.fecha_hora.slice(11, 16),
+      tarea: t ? t.tarea : b.codigo_publico || b.id_tarea,
+      proyecto_cod: t ? t.proyecto_cod : sub.slice(0, 3), subproyecto_cod: sub,
+      trabajo: !["automatico", "manual"].includes(b.via),
+      terminada: (b.accion === "estado" && ["hecha", "suspendida"].includes(b.despues)) || b.accion === "recurrencia",
+    };
+  });
+
+  function describir(a) {
+    switch (a.accion) {
+      case "alta": {
+        const [q, venc] = a.despues.split(" ");
+        return `Alta${q ? " en " + q : ""}${venc && /\d{4}-/.test(venc) ? ", vence " + fechaCorta(venc) : ""}`;
+      }
+      case "estado": return a.despues === "hecha" ? "Hecha ✓" : `${a.antes || "—"} → ${a.despues}`;
+      case "fechas": {
+        const campo = a.despues.startsWith("fecha_control") ? "Control" : "Vencimiento";
+        return `${campo}: ${valorFecha(a.antes.split("=")[1])} → ${valorFecha(a.despues.split("=")[1])}`;
+      }
+      case "cuadrante": case "mover_cuadrante": return `${a.antes} → ${a.despues}`;
+      case "avance": return `Avance: ${a.despues}`;
+      case "texto": return "Cambio de texto";
+      case "recurrencia": return `Cumplida la del ${valorFecha(a.antes)} ✓ · próxima ${valorFecha(a.despues)}`;
+      default: return `${a.accion}${a.antes || a.despues ? ": " + (a.antes ? a.antes + " → " : "") + a.despues : ""}`;
+    }
+  }
+
+  function accionesFiltradas() {
+    const desde = estado.periodo === "todo" ? "" : isoDia(new Date(hoy.getTime() - (Number(estado.periodo) - 1) * DIA));
+    return acciones.filter((a) =>
+      (estado.automaticos || a.trabajo) &&
+      (!estado.terminadas || a.terminada) &&
+      (!desde || a.dia >= desde) &&
+      (!estado.proyecto || a.proyecto_cod === estado.proyecto) &&
+      (!estado.texto || `${a.tarea} ${a.subproyecto_cod} ${a.texto_original} ${nombre(a.proyecto_cod)}`.toLowerCase().includes(estado.texto)));
+  }
+
+  function pintarHistorial() {
+    const cont = $("vista-historial");
+    if (!datos.bitacora) {
+      cont.innerHTML = '<p class="vacio">El historial está disponible en el tablero en vivo.</p>';
+      return;
+    }
+    const lista = accionesFiltradas().sort((a, b) => b.fecha_hora.localeCompare(a.fecha_hora));
+    if (lista.length === 0) { cont.innerHTML = '<div class="panel"><p class="vacio">No hay actividad con estos filtros.</p></div>'; return; }
+    cont.innerHTML = estado.modo === "proyecto" ? historialPorProyecto(lista) : historialPorDia(lista);
+  }
+
+  function historialPorDia(lista) {
+    const dias = new Map();
+    lista.forEach((a) => { if (!dias.has(a.dia)) dias.set(a.dia, []); dias.get(a.dia).push(a); });
+    return [...dias].map(([dia, items]) => {
+      const f = aFecha(dia);
+      const proyectosDia = new Set(items.map((a) => a.proyecto_cod)).size;
+      const hechas = items.filter((a) => a.terminada).length;
+      const titulo = `${DIAS_SEMANA[f.getDay()]} ${f.getDate()} de ${MESES_LARGOS[f.getMonth()]}${f.getFullYear() !== hoy.getFullYear() ? " de " + f.getFullYear() : ""}`;
+      const resumen = `${items.length} ${items.length === 1 ? "acción" : "acciones"} · ${proyectosDia} ${proyectosDia === 1 ? "proyecto" : "proyectos"}` +
+        (hechas ? ` · ${hechas} ${hechas === 1 ? "terminada" : "terminadas"}` : "");
+      return `<article class="historial-dia"><h2>${titulo[0].toUpperCase() + titulo.slice(1)}<span class="resumen">${resumen}</span></h2><ol>` +
+        items.map((a) => `<li><span class="hora">${a.hora}</span><div class="accion">` +
+          `<strong data-id="${escapar(a.id_tarea)}">${escapar(a.tarea)}</strong> · <span class="detalle">${escapar(describir(a))}</span>` +
+          `<span class="etiqueta">${escapar(a.subproyecto_cod)}</span>` +
+          (a.via && a.via !== "telegram" ? `<span class="etiqueta">${escapar(VIAS[a.via] || a.via)}</span>` : "") +
+          (a.terminada ? '<span class="etiqueta hecha">terminada</span>' : "") + "</div>" +
+          (a.texto_original ? `<div class="original" title="${escapar(a.texto_original)}">«${escapar(a.texto_original)}»</div>` : "") +
+          "</li>").join("") + "</ol></article>";
+    }).join("");
+  }
+
+  function historialPorProyecto(lista) {
+    // Con un proyecto elegido se desglosa por subproyecto; si no, por proyecto.
+    const clave = (a) => (estado.proyecto ? a.subproyecto_cod : a.proyecto_cod);
+    const primerDia = lista.reduce((m, a) => (a.dia < m ? a.dia : m), isoDia(hoy));
+    const inicio = estado.periodo === "todo" ? aFecha(primerDia) : new Date(hoy.getTime() - (Number(estado.periodo) - 1) * DIA);
+    const totalDias = Math.round((hoy - inicio) / DIA) + 1;
+    const grupos = new Map();
+    lista.forEach((a) => {
+      const k = clave(a) || "sin código";
+      if (!grupos.has(k)) grupos.set(k, new Map());
+      const dias = grupos.get(k);
+      dias.set(a.dia, (dias.get(a.dia) || 0) + 1);
+    });
+    const filas = [...grupos].map(([k, dias]) => ({ k, dias, ultimo: [...dias.keys()].sort().pop() }))
+      .sort((a, b) => b.ultimo.localeCompare(a.ultimo));
+    const html = filas.map(({ k, dias, ultimo }) => {
+      const ordenados = [...dias.keys()].sort();
+      const pausas = [];
+      for (let i = 1; i < ordenados.length; i++) {
+        const hueco = Math.round((aFecha(ordenados[i]) - aFecha(ordenados[i - 1])) / DIA);
+        if (hueco > 7) pausas.push(`Pausa de ${hueco - 1} días · retomado el ${fechaCorta(ordenados[i])}`);
+      }
+      const sinActividad = Math.round((hoy - aFecha(ultimo)) / DIA);
+      if (sinActividad > 7) pausas.push(`Sin actividad hace ${sinActividad} días`);
+      const acciones = [...dias.values()].reduce((s, n) => s + n, 0);
+      const celdas = [];
+      for (let i = 0; i < totalDias; i++) {
+        const f = new Date(inicio.getTime() + i * DIA);
+        const iso = isoDia(f); const n = dias.get(iso) || 0;
+        celdas.push(`<span class="${n ? "activo" : ""}${iso === isoDia(hoy) ? " hoy-celda" : ""}" title="${DIAS_SEMANA[f.getDay()]} ${corta(f)}${n ? " · " + n + (n === 1 ? " acción" : " acciones") : ""}"></span>`);
+      }
+      return `<section class="proyecto-hist"><h3>${escapar(nombre(k))}<span class="resumen">${dias.size} ${dias.size === 1 ? "día trabajado" : "días trabajados"} · ${acciones} ${acciones === 1 ? "acción" : "acciones"} · último: ${fechaCorta(ultimo)}</span></h3>` +
+        `<div class="tira" style="grid-template-columns:repeat(${totalDias},1fr)">${celdas.join("")}</div>` +
+        `<div class="tira-eje"><span>${corta(inicio)}</span><span>hoy</span></div>` +
+        (pausas.length ? `<ul class="pausas">${pausas.map((p) => `<li>${p}</li>`).join("")}</ul>` : "") + "</section>";
+    }).join("");
+    return `<div class="proyectos-hist">${html}</div>`;
+  }
+
   function pintar() {
     const lista = filtradas();
-    document.querySelectorAll("[data-vista]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.vista === estado.vista)));
-    $("vista-gantt").hidden = estado.vista !== "gantt";
-    $("vista-eisenhower").hidden = estado.vista !== "eisenhower";
-    $("filtro-rango").hidden = estado.vista !== "gantt";
-    if (estado.vista === "gantt") pintarGantt(lista); else pintarEisenhower(lista);
+    const v = estado.vista;
+    document.querySelectorAll("[data-vista]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.vista === v)));
+    document.querySelectorAll("[data-modo]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.modo === estado.modo)));
+    $("vista-gantt").hidden = v !== "gantt";
+    $("vista-eisenhower").hidden = v !== "eisenhower";
+    $("vista-historial").hidden = v !== "historial";
+    $("filtro-rango").hidden = v !== "gantt";
+    $("check-cerradas").hidden = v === "historial";
+    $("leyenda").hidden = v === "historial";
+    ["modo-historial", "filtro-periodo", "check-terminadas", "check-automaticos"].forEach((id) => { $(id).hidden = v !== "historial"; });
+    if (v === "gantt") pintarGantt(lista);
+    else if (v === "historial") pintarHistorial();
+    else pintarEisenhower(lista);
   }
   pintar();
 })();
